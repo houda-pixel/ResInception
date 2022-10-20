@@ -58,7 +58,7 @@ class InceptionBlock(nn.Module):
         return F.relu(self.out_conv(out) + self.residual_conv(x))
 
 @MODELS.register_module()
-class PCN_RESINCEPTION_encoder(nn.Module):
+class PCN_A(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.number_fine = config.num_pred

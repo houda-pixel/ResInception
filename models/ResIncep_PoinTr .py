@@ -112,7 +112,7 @@ class Fold(nn.Module):
         return fd2
 
 @MODELS.register_module()
-class PoinTr_inception(nn.Module):
+class ResIncep_PoinTr(nn.Module):
     def __init__(self, config, **kwargs):
         super().__init__()
         self.trans_dim = config.trans_dim

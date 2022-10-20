@@ -5,10 +5,8 @@ from torch.nn import init
 import numpy as np
 from collections import OrderedDict
 
-
 from .build import MODELS
 from extensions.chamfer_dist import ChamferDistanceL2
-
 
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
@@ -58,17 +56,13 @@ class InceptionBlock(nn.Module):
         return F.relu(self.out_conv(out) + self.residual_conv(x))
 
 @MODELS.register_module()
-class PCN_RESINCEPTION(nn.Module):
+class ResIncep_FoldingNet(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.number_fine = config.num_pred
+        self.num_pred = config.num_pred
         self.encoder_channel = config.encoder_channel
-        self.encoder_channel_3 = 3072
-        grid_size = 4 # set default
+        self.grid_size = int(pow(self.num_pred,0.5) + 0.5)
 
-        self.grid_size = grid_size
-        assert self.number_fine % grid_size**2 == 0
-        self.number_coarse = self.number_fine // (grid_size ** 2 )
         self.first_conv = nn.Sequential(
             nn.Conv1d(3,128,1),
             nn.BatchNorm1d(128),
@@ -81,34 +75,46 @@ class PCN_RESINCEPTION(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv1d(512,self.encoder_channel,1)
         )
-        self.mlp = nn.Sequential(
-            nn.Linear(self.encoder_channel,1024),
-            nn.ReLU(inplace=True),
-            nn.Linear(1024,1024),
-            nn.ReLU(inplace=True),
-            nn.Linear(1024,3*self.number_coarse)
-        )
-        # self.final_conv = nn.Sequential(
-        #     nn.Conv1d(1024+3+2,512,1),
+
+        # self.folding1 = nn.Sequential(
+        #     nn.Conv1d(self.encoder_channel + 2, 512, 1),
         #     nn.BatchNorm1d(512),
         #     nn.ReLU(inplace=True),
-        #     nn.Conv1d(512,512,1),
+        #     nn.Conv1d(512, 512, 1),
         #     nn.BatchNorm1d(512),
         #     nn.ReLU(inplace=True),
-        #     nn.Conv1d(512,3,1)
+        #     nn.Conv1d(512, 3, 1),
         # )
 
-        self.final_conv = nn.Sequential(
-            InceptionBlock(1024+3+2, 512, 128, 256, 64, 128, 128, 512),
-            InceptionBlock(512, 128, 64, 128, 64, 32, 32, 3)
+        self.folding1 = nn.Sequential(
 
+            InceptionBlock(self.encoder_channel + 2, 512, 128, 256, 64, 128, 128, 512),
+            InceptionBlock(512, 128, 64, 128, 64, 32, 32, 3)
+          
         )
 
+        self.folding2 = nn.Sequential(
+            nn.Conv1d(self.encoder_channel + 3, 512, 1),
+            nn.BatchNorm1d(512),
+            nn.ReLU(inplace=True),
+            nn.Conv1d(512, 512, 1),
+            nn.BatchNorm1d(512),
+            nn.ReLU(inplace=True),
+            nn.Conv1d(512, 3, 1),
+        )
 
-        a = torch.linspace(-0.05, 0.05, steps=grid_size, dtype=torch.float).view(1, grid_size).expand(grid_size, grid_size).reshape(1, -1)
-        b = torch.linspace(-0.05, 0.05, steps=grid_size, dtype=torch.float).view(grid_size, 1).expand(grid_size, grid_size).reshape(1, -1)
-        self.folding_seed = torch.cat([a, b], dim=0).view(1, 2, grid_size ** 2).cuda() # 1 2 S
-        # self.folding_seed = torch.cat([a, b], dim=0).view(1, 2, grid_size ** 2) # 1 2 S
+        # self.folding2 = nn.Sequential(
+        #     InceptionBlock(self.encoder_channel + 3, 256, 64, 128, 32, 64, 128, 3)
+        #     # InceptionBlock(self.encoder_channel + 3, 512, 128, 256, 64, 128, 128, 512),
+        #     # InceptionBlock(512, 128, 64, 128, 64, 32, 32, 3)
+
+        # )
+
+        a = torch.linspace(-0.5, 0.5, steps=self.grid_size, dtype=torch.float).view(1, self.grid_size).expand(self.grid_size, self.grid_size).reshape(1, -1)
+        b = torch.linspace(-0.5, 0.5, steps=self.grid_size, dtype=torch.float).view(self.grid_size, 1).expand(self.grid_size, self.grid_size).reshape(1, -1)
+        self.folding_seed = torch.cat([a, b], dim=0).view(1, 2, self.grid_size ** 2).cuda() # 1 2 N
+        # self.folding_seed = torch.cat([a, b], dim=0).view(1, 2, self.grid_size ** 2) # 1 2 N
+
         self.build_loss_func()
 
     def build_loss_func(self):
@@ -120,41 +126,27 @@ class PCN_RESINCEPTION(nn.Module):
         return loss_coarse, loss_fine
 
     def forward(self, xyz):
-
-        # print(xyz.shape)
         bs , n , _ = xyz.shape
         # encoder
-        #xyz = torch.flip(xyz, dims=(1,))
-        xyz = xyz[:, torch.randperm(xyz.shape[1]), :]
         feature = self.first_conv(xyz.transpose(2,1))  # B 256 n
         feature_global = torch.max(feature,dim=2,keepdim=True)[0]  # B 256 1
-        
         feature = torch.cat([feature_global.expand(-1,-1,n), feature], dim=1)# B 512 n
         feature = self.second_conv(feature) # B 1024 n
         feature_global = torch.max(feature,dim=2,keepdim=False)[0] # B 1024
+        # folding decoder
+        fd1, fd2 = self.decoder(feature_global) # B N 3
+        return (fd2, fd2) # FoldingNet producing final result directly
         
-        # print("feature_global", feature_global.shape)
+    def decoder(self,x):
+        num_sample = self.grid_size * self.grid_size
+        bs = x.size(0)
+        features = x.view(bs, self.encoder_channel, 1).expand(bs, self.encoder_channel, num_sample)
+        seed = self.folding_seed.view(1, 2, num_sample).expand(bs, 2, num_sample).to(x.device)
 
+        x = torch.cat([seed, features], dim=1)
+        fd1 = self.folding1(x)
+        x = torch.cat([fd1, features], dim=1)
+        fd2 = self.folding2(x)
 
-        # decoder
-        coarse = self.mlp(feature_global).reshape(-1,self.number_coarse,3) # B M 3
-        # print("coarse", coarse.shape)
-
-        point_feat = coarse.unsqueeze(2).expand(-1,-1,self.grid_size**2,-1) # B M S 3
-        point_feat = point_feat.reshape(-1,self.number_fine,3).transpose(2,1) # B 3 N
-        # print("point_feat", point_feat.shape)
-
-
-        seed = self.folding_seed.unsqueeze(2).expand(bs,-1,self.number_coarse, -1) # B 2 M S
-        seed = seed.reshape(bs,-1,self.number_fine)  # B 2 N
-
-        feature_global = feature_global.unsqueeze(2).expand(-1,-1,self.number_fine) # B 1024 N
-        feat = torch.cat([feature_global, seed, point_feat], dim=1) # B C N
-        
-        # print("feat", feat.shape)
-        fine = self.final_conv(feat) + point_feat   # B 3 N
-
-        # print("fine", fine.shape)
-
-
-        return (coarse.contiguous(), fine.transpose(1,2).contiguous())
+        return fd1.transpose(2,1).contiguous() , fd2.transpose(2,1).contiguous()
+        # return fd2.transpose(2,1).contiguous()

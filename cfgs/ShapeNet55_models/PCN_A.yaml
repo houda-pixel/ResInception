@@ -12,14 +12,14 @@ scheduler: {
 }}
 
 dataset : {
-  train : { _base_: cfgs/dataset_configs/ShapeNet-34.yaml, 
+  train : { _base_: cfgs/dataset_configs/ShapeNet-55.yaml, 
             others: {subset: 'train'}},
-  val : { _base_: cfgs/dataset_configs/ShapeNet-34.yaml, 
+  val : { _base_: cfgs/dataset_configs/ShapeNet-55.yaml, 
             others: {subset: 'test'}},
-  test : { _base_: cfgs/dataset_configs/ShapeNet-Unseen21.yaml, 
-            others: {subset: 'test'}}}     
+  test : { _base_: cfgs/dataset_configs/ShapeNet-55.yaml, 
+            others: {subset: 'test'}}}          
 model : {
-  NAME: PCN_RESINCEPTION, num_pred: 8192, encoder_channel: 1024}
+  NAME: PCN_A, num_pred: 8192, encoder_channel: 1024}
 total_bs : 32  
 step_per_update : 1
 max_epoch : 150
