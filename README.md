@@ -1,20 +1,6 @@
-# PoinTr: Diverse Point Cloud Completion with Geometry-Aware Transformers
+# Inception-based Deep Learning Architecture for 3D Point Cloud Completion
 
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/pointr-diverse-point-cloud-completion-with/point-cloud-completion-on-shapenet)](https://paperswithcode.com/sota/point-cloud-completion-on-shapenet?p=pointr-diverse-point-cloud-completion-with)
-
-Created by [Xumin Yu](https://yuxumin.github.io/)\*, [Yongming Rao](https://raoyongming.github.io/)\*, [Ziyi Wang](https://github.com/LavenderLA), [Zuyan Liu](https://github.com/lzy-19), [Jiwen Lu](https://scholar.google.com/citations?user=TN8uDQoAAAAJ&hl=en&authuser=1), [Jie Zhou](https://scholar.google.com/citations?user=6a79aPwAAAAJ&hl=en&authuser=1)
-
-[[arXiv]](https://arxiv.org/abs/2108.08839) [[Video]](https://youtu.be/mSGphas0p8g) [[Dataset]](./DATASET.md) [[Models]](#pretrained-models) [[supp]](https://yuxumin.github.io/files/PoinTr_supp.pdf)
-
-This repository contains PyTorch implementation for __PoinTr: Diverse Point Cloud Completion with Geometry-Aware Transformers__ (ICCV 2021 Oral Presentation).
-
-PoinTr is a transformer-based model for point cloud completion.  By representing the point cloud as a set of unordered groups of points with position embeddings, we convert the point cloud to a sequence of point proxies and employ a transformer encoder-decoder architecture for generation. We also propose two more challenging benchmarks [ShapeNet-55/34](./DATASET.md) with more diverse incomplete point clouds that can better reflect the real-world scenarios to promote future research.
-
-![intro](fig/pointr.gif)
-
-## 🔥News
-- **2021-10-07** Our solution based on PoinTr wins the ***Championship*** on [MVP Completion Challenge (ICCV Workshop 2021)](https://mvp-dataset.github.io/MVP/Completion.html). The code will come soon.
-- **2021-09-09** Fix a bug in `datasets/PCNDataset.py`[(#27)](https://github.com/hzxie/GRNet/pull/27), and update the performance of PoinTr on PCN benchmark (CD from 8.38 to ***7.26***).
+This repository contains PyTorch implementation for: Inception-based Deep Learning Architecture for 3D Point Cloud Completion. 
 
 ## Pretrained Models
 
@@ -77,29 +63,20 @@ bash ./scripts/test.sh <GPU_IDS>  \
 ```
 
 ####  Some examples:
-Test the PoinTr pretrained model on the PCN benchmark:
+Test the ResIncep-PoinTr pretrained model on the PCN benchmark:
 ```
 bash ./scripts/test.sh 0 \
-    --ckpts ./pretrained/PoinTr_PCN.pth \
-    --config ./cfgs/PCN_models/PoinTr.yaml \
+    --ckpts ./PCN/ResIncep-PoinTr/ckpt-best.pth \
+    --config ./cfgs/PCN_models/ResIncep-PoinTr.yaml \
     --exp_name example
 ```
-Test the PoinTr pretrained model on ShapeNet55 benchmark (*easy* mode):
+Test the ResIncep-PoinTr pretrained model on ShapeNet55 benchmark (*easy* mode):
 ```
 bash ./scripts/test.sh 0 \
-    --ckpts ./pretrained/PoinTr_ShapeNet55.pth \
-    --config ./cfgs/ShapeNet55_models/PoinTr.yaml \
+    --ckpts ./ShapeNet-55/ResIncep-PoinTr/ckpt-best.pth \
+    --config ./cfgs/ShapeNet55_models/ResIncep-PoinTr.yaml \
     --mode easy \
     --exp_name example
-```
-Test the PoinTr pretrained model on the KITTI benchmark:
-```
-bash ./scripts/test.sh 0 \
-    --ckpts ./pretrained/PoinTr_KITTI.pth \
-    --config ./cfgs/KITTI_models/PoinTr.yaml \
-    --exp_name example
-CUDA_VISIBLE_DEVICES=0 python KITTI_metric.py \
-    --vis <visualization_path> 
 ```
 
 ### Training
@@ -123,59 +100,25 @@ bash ./scripts/train.sh <GPUIDS> \
     [--val_freq <int>]
 ```
 ####  Some examples:
-Train a PoinTr model on PCN benchmark with 2 gpus:
+Train a ResIncep-PoinTr model on PCN benchmark with 2 gpus:
 ```
 CUDA_VISIBLE_DEVICES=0,1 bash ./scripts/dist_train.sh 2 13232 \
-    --config ./cfgs/PCN_models/PoinTr.yaml \
+    --config ./cfgs/PCN_models/ResIncep-PoinTr.yaml \
     --exp_name example
 ```
 Resume a checkpoint:
 ```
 CUDA_VISIBLE_DEVICES=0,1 bash ./scripts/dist_train.sh 2 13232 \
-    --config ./cfgs/PCN_models/PoinTr.yaml \
+    --config ./cfgs/PCN_models/ResIncep-PoinTr.yaml \
     --exp_name example --resume
 ```
 
-Finetune a PoinTr on PCNCars
-```
-CUDA_VISIBLE_DEVICES=0,1 bash ./scripts/dist_train.sh 2 13232 \
-    --config ./cfgs/KITTI_models/PoinTr.yaml \
-    --exp_name example \
-    --start_ckpts ./weight.pth
-```
-
-Train a PoinTr model with a single GPU:
+Train a ResIncep-PoinTr model with a single GPU:
 ```
 bash ./scripts/train.sh 0 \
-    --config ./cfgs/KITTI_models/PoinTr.yaml \
-    --exp_name example
-```
+    --config ./cfgs/PCN_models/ResIncep-PoinTr.yaml
 
-We also provide the Pytorch implementation of several baseline models including GRNet, PCN, TopNet and FoldingNet. For example, to train a GRNet model on ShapeNet-55, run:
-```
-CUDA_VISIBLE_DEVICES=0,1 bash ./scripts/dist_train.sh 2 13232 \
-    --config ./cfgs/ShapeNet55_models/GRNet.yaml \
-    --exp_name example
-```
+````
 
-### Completion Results on ShapeNet55 and KITTI-Cars
-
-![results](fig/VisResults.gif)
-
-## License
-MIT License
-
-## Acknowledgements
-
-Our code is inspired by [GRNet](https://github.com/hzxie/GRNet) and [mmdetection3d](https://github.com/open-mmlab/mmdetection3d).
-
-## Citation
-If you find our work useful in your research, please consider citing: 
-```
-@inproceedings{yu2021pointr,
-  title={PoinTr: Diverse Point Cloud Completion with Geometry-Aware Transformers},
-  author={Yu, Xumin and Rao, Yongming and Wang, Ziyi and Liu, Zuyan and Lu, Jiwen and Zhou, Jie},
-  booktitle={ICCV},
-  year={2021}
-}
-```
+#### Acknowledgment:
+This repository is forked from: https://github.com/yuxumin/PoinTr. We thank the authors for their amazing work.
